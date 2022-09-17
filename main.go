@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/progrium/go-shell"
@@ -38,26 +39,12 @@ func PathExists(path string) (bool, error) {
 	return false, err
 }
 
-func UpdateRepo(name string, pkgMap map[string]string, pwd string) {
-	os.Chdir(pwd)
-	// gitUrl := fmt.Sprintf("http://oauth2:CdVcbeg21xv8PuJ48exN@runafe.cn:8088/wangxd/%s.git", name)
-	gitUrl := fmt.Sprintf("http://oauth2:d6n9LvaWsoZazzQFx4hV@wangxd.cn:8088/wxdtest/%s.git", name)
-	repo := "./repositories"
+func UpdateRepo(name string, pkgMap map[string]string, exctPath string, done func()) {
+	gitUrl := fmt.Sprintf("http://oauth2:svazkrYzqkMZeWaKx86b@runafe.cn:8088/v4/%s.git", name)
+	// gitUrl := fmt.Sprintf("http://oauth2:d6n9LvaWsoZazzQFx4hV@wangxd.cn:8088/wxdtest/%s.git", name)
 
-	if ok, _ := PathExists(repo); !ok {
-		os.Mkdir(repo, 0777)
-	}
-
-	os.Chdir("./repositories")
-	if info, err := os.Stat(name); err == nil {
-		name := info.Name()
-		if err := os.RemoveAll(name); err != nil {
-			fmt.Print(err)
-			panic(err)
-		}
-	}
-	sh("git", "clone", gitUrl)
-	jsonObj, err := gabs.ParseJSONFile(fmt.Sprintf("./%s/package.json", name))
+	sh("git", "clone", gitUrl, "--branch", "dev", "--single-branch")
+	jsonObj, err := gabs.ParseJSONFile(fmt.Sprintf("%s/package.json", exctPath))
 	if err != nil {
 		panic(err)
 	}
@@ -71,19 +58,24 @@ func UpdateRepo(name string, pkgMap map[string]string, pwd string) {
 	// TODO can not sort the key
 	// https://github.com/golang/go/issues/27179
 	// https://github.com/golang/go/issues/6244
-	os.WriteFile(fmt.Sprintf("./%s/package.json", name), jsonObj.EncodeJSON(gabs.EncodeOptHTMLEscape(false), gabs.EncodeOptIndent("", "  ")), 7770)
+	os.WriteFile(fmt.Sprintf("%s/package.json", exctPath), jsonObj.EncodeJSON(gabs.EncodeOptHTMLEscape(false), gabs.EncodeOptIndent("", "  ")), 7770)
 
-	os.Chdir(name)
+	os.Chdir(exctPath)
 	sh("git", "commit", "-am", "'chore: update package.json'")
-	sh("git", "push")
-	sh("echo Done")
+	// sh("git", "push")
+	// sh("echo Done")
+
+	fmt.Printf("%s done\n", name)
+	done()
 }
 
 func main() {
 	defer shell.ErrExit()
-	repos := []string{"test1", "test2", "test3"}
+	start := time.Now()
+	repos := []string{"web-monitor", "web-maintain", "web-ai", "web-charge", "web-AIScheduler", "web-analysis", "web-balance", "web-dashboard", "web-dataCenter", "web-device", "web-dispatchCommand", "web-dispatchplatform", "web-emerg-conduct", "web-gis", "web-giscience", "web-meter", "web-powermonitor", "web-temAnalysis", "web-user", "web-wechat", "web-wechat2", "web-wechatCharge"}
+
 	updatedPkgMap := map[string]string{
-		"@runafe/runa-system": "2.0.5-beta.1",
+		"@runafe/runa-system": "2.0.5-beta.10",
 		"dayjs":               "1.0.1",
 	}
 
@@ -92,8 +84,44 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	os.Chdir(pwd)
+	repo := "repositories"
+
+	if ok, _ := PathExists(repo); !ok {
+		os.Mkdir(repo, 0777)
+	}
+
+	os.Chdir(repo)
 
 	for _, name := range repos {
-		UpdateRepo(name, updatedPkgMap, pwd)
+		if _, err := os.Stat(name); err == nil {
+			if err := os.RemoveAll(name); err != nil {
+				fmt.Print(err)
+				panic(err)
+			}
+		}
+		exactPath := fmt.Sprintf("%s/%s/%s", pwd, repo, name)
+		fmt.Println(exactPath)
+		UpdateRepo(name, updatedPkgMap, exactPath, func() {
+		})
 	}
+
+	// var wg sync.WaitGroup
+	// wg.Add(len(repos))
+	// for _, name := range repos {
+	// 	if _, err := os.Stat(name); err == nil {
+	// 		if err := os.RemoveAll(name); err != nil {
+	// 			fmt.Print(err)
+	// 			panic(err)
+	// 		}
+	// 	}
+	// 	exactPath := fmt.Sprintf("%s/%s/%s", pwd, repo, name)
+	// 	fmt.Println(exactPath)
+	// 	go UpdateRepo(name, updatedPkgMap, exactPath, func() {
+	// 		wg.Done()
+	// 	})
+	// }
+	// wg.Wait()
+
+	fmt.Println("Verify:", time.Since(start))
 }
