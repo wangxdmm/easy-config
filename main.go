@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
 	"github.com/Jeffail/gabs/v2"
 	"github.com/progrium/go-shell"
@@ -28,19 +27,27 @@ type PackageJson struct {
 	DevDependencies map[string]string `json:"devDependencies"`
 }
 
-func ConfigGit() {
-	if _, err := exec.Command("git", "config", "--global", "user.name", "fe-pub-bot").Output(); err != nil {
-		panic("Config user.name error")
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
 	}
-
-	if _, err := exec.Command("git", "config", "--global", "user.email", "1121292341@qq.com").Output(); err != nil {
-		panic("Config user.email error")
+	if os.IsNotExist(err) {
+		return false, nil
 	}
+	return false, err
 }
 
-func UpdateRepo(name string) {
+func UpdateRepo(name string, pkgMap map[string]string, pwd string) {
+	os.Chdir(pwd)
 	// gitUrl := fmt.Sprintf("http://oauth2:CdVcbeg21xv8PuJ48exN@runafe.cn:8088/wangxd/%s.git", name)
-	gitUrl := fmt.Sprintf("http://pub-bot:6Q4ybPpgdKPxS6azN_n1@runafe.cn:8088/wxdtest/%s.git", name)
+	gitUrl := fmt.Sprintf("http://oauth2:d6n9LvaWsoZazzQFx4hV@wangxd.cn:8088/wxdtest/%s.git", name)
+	repo := "./repositories"
+
+	if ok, _ := PathExists(repo); !ok {
+		os.Mkdir(repo, 0777)
+	}
+
 	os.Chdir("./repositories")
 	if info, err := os.Stat(name); err == nil {
 		name := info.Name()
@@ -55,8 +62,10 @@ func UpdateRepo(name string) {
 		panic(err)
 	}
 	for key := range jsonObj.S("dependencies").ChildrenMap() {
-		if key == "@runafe/runa-system" {
-			jsonObj.Set("2.0.1", "dependencies", key)
+		for k, v := range pkgMap {
+			if key == k {
+				jsonObj.Set(v, "dependencies", key)
+			}
 		}
 	}
 	// TODO can not sort the key
@@ -72,20 +81,19 @@ func UpdateRepo(name string) {
 
 func main() {
 	defer shell.ErrExit()
-	// data, err := ioutil.ReadFile("./test/package.json")
-	// if err != nil {
-	// 	panic("Read package file failed")
-	// }
+	repos := []string{"test1", "test2", "test3"}
+	updatedPkgMap := map[string]string{
+		"@runafe/runa-system": "2.0.5-beta.1",
+		"dayjs":               "1.0.1",
+	}
 
-	// var pkg PackageJson
+	pwd, err := os.Getwd()
 
-	// err = json.Unmarshal(data, &pkg)
+	if err != nil {
+		panic(err)
+	}
 
-	// if err != nil {
-	// 	panic("Parse JSON failed")
-	// }
-
-	// fmt.Println(pkg.Dependencies["lodash"])
-
-	UpdateRepo("test")
+	for _, name := range repos {
+		UpdateRepo(name, updatedPkgMap, pwd)
+	}
 }
